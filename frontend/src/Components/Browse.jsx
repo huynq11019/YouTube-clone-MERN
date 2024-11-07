@@ -11,8 +11,8 @@ import "../Css/theme.css";
 import { useSelector } from "react-redux";
 
 function Browse() {
-  const backendURL = "https://youtube-clone-mern-backend.vercel.app"
-  // const backendURL = "http://localhost:3000";
+  // const backendURL = "https://youtube-clone-mern-backend.vercel.app"
+  const backendURL = "http://localhost:3000";
   const [thumbnails, setThumbnails] = useState([]);
   const [Titles, setTitles] = useState();
   const [uploader, setUploader] = useState();

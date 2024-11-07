@@ -1,16 +1,35 @@
 version: "3.8"
 services:
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: root
+      ME_CONFIG_MONGODB_URL: mongodb://root:root@mongo:27017/
+      ME_CONFIG_BASICAUTH: false
   backend:
     image: shubhobera09/youtube-backend
     ports:
       - "3000:3000"
     environment:
-      DB_user: your_user
-      DB_password: your_db_password
-      DB_name: your_db_name
-      SECRET_KEY: jwt_secret
-      EMAIL: email_address
-      PASSWORD: google_app_password
+      DB_user: root
+      DB_password: root
+      DB_name: moitube
+      SECRET_KEY: 123456789)(*&^%$@!
+      EMAIL: huynq1808@gmal.com
+      PASSWORD: irca sxbi mnly wrzt
 
   frontend:
     image: shubhobera09/youtube-frontend

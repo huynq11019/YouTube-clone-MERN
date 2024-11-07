@@ -32,8 +32,8 @@ import TwitterIcon from "@mui/icons-material/Twitter";
 import LanguageIcon from "@mui/icons-material/Language";
 
 function Studio() {
-  const backendURL = "https://youtube-clone-mern-backend.vercel.app"
-  // const backendURL = "http://localhost:3000";
+  // const backendURL = "https://youtube-clone-mern-backend.vercel.app"
+  const backendURL = "http://localhost:3000";
   const [isChannel, setisChannel] = useState();
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedThumbnail, setSelectedThumbnail] = useState(null);
@@ -482,7 +482,8 @@ function Studio() {
       const img = new Image();
       img.onload = function () {
         const aspectRatio = img.width / img.height;
-        if (Math.abs(aspectRatio - 16 / 9) < 0.01) {
+        if (Math.abs(aspectRatio - 16 / 9) < 0.01 || true) {
+          console.log('Aspect ratio is 16:9');
           setSelectedThumbnail(file);
           setPreviewThumbnail(URL.createObjectURL(file));
           setIsThumbnailSelected(true);

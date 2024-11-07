@@ -48,6 +48,10 @@ auth.post("/signup", async (req, res) => {
     const refreshToken = generateRefreshToken(saveData);
 
     // Nodemailer configuration
+    console.log('email service ', {
+      user: process.env.EMAIL,
+      pass: process.env.PASSWORD,
+    })
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -57,18 +61,18 @@ auth.post("/signup", async (req, res) => {
     });
 
     const mailOptions = {
-      from: "admin@shubho.youtube.app",
+      from: process.env.EMAIL,
       to: email,
       subject: "Welcome to Shubho's YouTube Clone!",
       html: `
         <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px;">
-          <h1 style="color: #333;">Welcome to Shubho's YouTube Clone!</h1>
+          <h1 style="color: #333;">Welcome to Moitube!</h1>
           <p style="color: #555;">Hello ${name},</p>
           <p style="color: #555;">We are excited to have you as a new member of our community! Thank you for joining.</p>
           <p style="color: #555;">Feel free to explore our platform and start sharing your videos with the world.</p>
           <p style="color: #555;">If you have any questions or need assistance, don't hesitate to reach out to us.</p>
           <p style="color: #555;">Best regards,</p>
-          <p style="color: #555;">Shubhojeet Bera</p>
+          <p style="color: #555;">Moi admin</p>
         </div>
       `,
     };

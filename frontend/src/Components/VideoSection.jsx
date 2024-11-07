@@ -34,10 +34,11 @@ import "react-toastify/dist/ReactToastify.css";
 import LeftPanel from "./LeftPanel";
 import Error from "./Error";
 import { useSelector } from "react-redux";
+import VideoPlayer from "./VideoPlayer.jsx";
 
 function VideoSection() {
-  const backendURL = "https://youtube-clone-mern-backend.vercel.app";
-  // const backendURL = "http://localhost:3000";
+  // const backendURL = "https://youtube-clone-mern-backend.vercel.app";
+  const backendURL = "http://localhost:3000";
   const { id } = useParams();
   const [videoData, setVideoData] = useState(null);
   const [channelName, setChannelName] = useState();
@@ -733,7 +734,7 @@ function VideoSection() {
           }
         );
         const { message, likes } = await response.json();
-        if ((message = "Comment liked successfully")) {
+        if ((message == "Comment liked successfully")) {
           setCommentLikes(likes);
         } else {
           setCommentLikes(likes);
@@ -1042,14 +1043,17 @@ function VideoSection() {
       >
         <div className="left-video-section2">
           <div className="videoframe">
-            <video
-              className="play-video"
-              controls
-              ref={videoRef}
-              poster={thumbnailURL}
-            >
-              <source src={videoURL} type="video/mp4" />
-            </video>
+            <VideoPlayer
+                className="play-video"
+                videoUrl={videoURL} />
+            {/*<video*/}
+            {/*  className="play-video"*/}
+            {/*  controls*/}
+            {/*  ref={videoRef}*/}
+            {/*  poster={thumbnailURL}*/}
+            {/*>*/}
+            {/*  <source src={videoURL} type="video/mp4" />*/}
+            {/*</video>*/}
           </div>
           <p
             className={theme ? "trending-tag" : "trending-tag-light"}

@@ -4,12 +4,14 @@ import {getFirestore} from "firebase/firestore"
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyB9NomQPgAoQ6B1c64XhN3ahqN0U1Fe3YU",
-  authDomain: "mern-df125.firebaseapp.com",
-  projectId: "mern-df125",
-  storageBucket: "mern-df125.appspot.com",
-  messagingSenderId: "757150184874",
-  appId: "1:757150184874:web:16b30a921277ea328527d3"
+  apiKey: "AIzaSyBbGNe_sYx8N09SWbcOfCmLNVfkWvQ4Jbg",
+  authDomain: "me-chat-a2693.firebaseapp.com",
+  databaseURL: "https://me-chat-a2693-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "me-chat-a2693",
+  storageBucket: "me-chat-a2693.appspot.com",
+  messagingSenderId: "352618140115",
+  appId: "1:352618140115:web:5d18e81fd6aae0402d1f26",
+  measurementId: "G-4QT1PTL3L6"
 };
 
 // Initialize Firebase

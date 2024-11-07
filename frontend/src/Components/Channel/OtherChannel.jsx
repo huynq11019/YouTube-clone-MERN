@@ -22,8 +22,8 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useSelector } from "react-redux";
 function OtherChannel() {
-  const backendURL = "https://youtube-clone-mern-backend.vercel.app"
-  // const backendURL = "http://localhost:3000";
+  // const backendURL = "https://youtube-clone-mern-backend.vercel.app"
+  const backendURL = "http://localhost:3000";
   const { id } = useParams();
   const [Email, setEmail] = useState();
   const [channelName, setChannelname] = useState();
