@@ -12,7 +12,14 @@
   height: 40px;
   overflow: scroll;
 }
+.browse-thumbnails {
+  object-fit: scale-down;
 
+}
+.browse-thumbnails:hover {
+  cursor: pointer;
+  border: solid;
+}
 .top-tags {
   cursor: pointer;
   background-color: #292929;
@@ -113,6 +120,9 @@
 
 .title {
   font-weight: 500 !important;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .title2 {
@@ -265,6 +275,7 @@
 
 @media (max-width: 1100px) {
   .browse-thumbnails {
+    height: 152px !important;
     width: 270px !important;
   }
 
@@ -310,6 +321,7 @@
   }
 
   .browse-thumbnails {
+    height: 163px !important;
     width: 290px !important;
   }
 
@@ -346,6 +358,7 @@
     left: 60px;
   }
   .browse-thumbnails {
+    height: 253px !important;
     width: 450px !important;
   }
   .duration {
@@ -362,6 +375,8 @@
   }
   .title {
     font-size: 17px;
+    text-overflow: ellipsis;
+    overflow: hidden;
   }
   .video-uploader > p,
   .view-time > p {
@@ -412,6 +427,7 @@
   }
 
   .browse-thumbnails {
+    height: 208px !important;
     width: 370px !important;
     margin-right: 20px;
   }
@@ -449,6 +465,7 @@
 
 @media (max-width: 425px) {
   .browse-thumbnails {
+    height: 183px !important;
     width: 325px !important;
     margin-right: 10px;
   }

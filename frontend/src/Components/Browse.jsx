@@ -351,7 +351,7 @@ function Browse() {
                       }}
                     >
                       <img
-                        style={{ width: "330px", borderRadius: "10px" }}
+                        style={{ width: "330px", height:"185px",borderRadius: "10px" }}
                         src={element}
                         alt="thumbnails"
                         className="browse-thumbnails"
@@ -513,7 +513,7 @@ function Browse() {
                       }}
                     >
                       <img
-                        style={{ width: "330px", borderRadius: "10px" }}
+                        style={{ width: "330px", height: "185px", borderRadius: "10px" }}
                         src={element.thumbnailURL}
                         alt="thumbnails"
                         className="browse-thumbnails"

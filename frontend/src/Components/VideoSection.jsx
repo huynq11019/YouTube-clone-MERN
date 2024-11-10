@@ -1043,6 +1043,7 @@ function VideoSection() {
       >
         <div className="left-video-section2">
           <div className="videoframe">
+            {/*video url*/}
             <VideoPlayer
                 className="play-video"
                 videoUrl={videoURL} />

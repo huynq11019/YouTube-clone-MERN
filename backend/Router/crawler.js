@@ -5,29 +5,34 @@ const cookieParser = require("cookie-parser");
 const axios = require('axios');
 const cheerio = require('cheerio');
 const FormData = require('form-data');
+const VideoRawDataModel = require("../Models/videos_raw");
 // ============= phimmoi-club start ==============
 const Crawler = express.Router();
 
-const getVideoInforFromUrl = async (videoUrl) => {
+const getVideoInforFromUrlPhimmoiclub = async (videoUrl) => {
     const {data} = await axios.get(videoUrl);
     const $ = cheerio.load(data);
     const videoData = {
-        "videoTitle": "xxx",
-        "videoDescription": "xx",
-        "tags": "xx",
-        "videoLink": "xxx",
+        thumbnailURL: undefined,
+        "Description": "xx",
+        "Tags": "xx",
+        Title: "xxx",
+        videoURL: "xxx",
         "thumbnailLink": "xxx",
-        "email": "huyentester12@gmail.com",
-        "video_duration": 42.028005,
-        "publishDate": "2024-11-03T16:16:15.560Z",
-        "Visibility": "Public"
+        "email": "xxx",
+        "videoLength": 42.028005,
+        views: 0,
+        rawData: {
+            source: data
+        },
     }
     // get video title
-    videoData.videoTitle = $('.sheader div.data h1').text();
-    videoData.thumbnailLink = $('.sheader .poster img ').attr('src');
-    videoData.publishDate = new Date().toISOString();
+    videoData.Title = $('.sheader div.data h1').text();
+    videoData.thumbnailURL = $('.sheader .poster img ').attr('src');
     const videoDescription = $('.wp-content p');
-    videoData.videoDescription = videoDescription.text();
+    videoData.Description = videoDescription.text();
+    // TODO Cần nâng lấy thông tin tag và meta data
+
 
     // Khởi tạo FormData và thêm các trường
     const videoPostId = $('#dooplay-ajax-counter ').attr('data-postid');
@@ -42,11 +47,8 @@ const getVideoInforFromUrl = async (videoUrl) => {
             ...form.getHeaders(), // Thiết lập headers từ form
         }
     }).then(res => res.data);
-    console.log('linkRest', linkRest.embed_url)
-    const videoLink = linkRest.embed_url || '';
-    videoData.videoLink = videoLink;
+    videoData.videoURL = linkRest.embed_url || '';
 
-    console.log('videosxxx', JSON.stringify(videoData))
     return videoData;
 }
 
@@ -72,58 +74,206 @@ Crawler.post("/crawl/phimmoi-club/by-url", async (req, res) => {
     //   });
     // }
     const {
-        videoUrl
+        videoUrl,
+        email
     } = req.body;
     if (!videoUrl) {
         return res.status(400).json("Invalid video URL");
     }
+    const videoRaw = new VideoRawDataModel({
+        sourceUrl: videoUrl,
+        domain: 'phimmoi.club',
+        status: 'waiting',
+    });
     try {
+        // check  src existed
+        const existed = await VideoRawDataModel.findOne({sourceUrl: videoUrl});
+        if (existed) {
+            return res.status(200).json(existed?.results);
+        }
+        const videoData = await getVideoInforFromUrlPhimmoiclub(videoUrl);
+        videoData.email = email;
 
-        const videoData = await getVideoInforFromUrl(videoUrl);
+        videoRaw.status = 'done';
+        videoRaw.results = videoData;
+        await videoRaw.save();
+
         return res.status(200).json(videoData);
     } catch (error) {
         console.error(error);
-        return res.status(500).json({message: "An error occurred"});
+        videoRaw.status = 'error';
+        videoRaw.error = error.message;
+    } finally {
+        await videoRaw.save();
     }
+    return res.status(500).json({message: "An error occurred"});
+
 })
 // ============= phimmoi-club end ==============
-//  =============
+//  ============= phimmoichill-biz start ==============
+const getVideoInforFromUrlChill = async (videoUrl) => {
+
+    const {data} = await axios.get(videoUrl);
+    const videoData = {
+        "Title": "xxx",
+        "Description": "xx",
+        "Tags": "xx",
+
+        "videoURL": "xxx",
+        "videoLength": 42.028005,
+        thumbnailURL: undefined,
+        email: "xxx",
+        views: 0,
+        rawData: {
+            source:  data
+        },
+    };
+    console.log('data from ', data)
+    const $ = cheerio.load(data);
+    videoData.Title = $('h1[itemprop=\'name\']').text();
+    videoData.Description = $('div.film-info > p').text();
+    videoData.thumbnailURL = $('img[itemprop=\'thumbnailUrl\']').attr('src');
+    // TODO Cần nâng lấy thông tin tag và meta data
+
+    // lấy link video
+    const extractId = (url) => {
+        const match = url.match(/pm(\d+)$/);
+        return match ? match[1] : null;
+    }
+    const qcao = extractId(videoUrl);
+    const form = new FormData();
+    form.append('qcao', qcao);
+    const videoRes = await axios.post('https://phimmoichill.biz/chillsplayer.php', form, {
+        headers: {
+            ...form.getHeaders(), // Thiết lập headers từ form
+        }
+    }).then(res => res.data);
+    console.log('videoRes', videoRes)
+    const regex = /iniPlayers\("([a-zA-Z0-9]+)"\s*,\s*\d+\s*,\s*\);/;
+    const match = videoRes.match(regex);
+
+    if (!match) {
+        console.log("Không tìm thấy ID.");
+    }
+    const videoId = match[1];
+    console.log('videoId', videoId)
+    videoData.videoURL = `https://dash.motchills.net/raw/${videoId}/index.m3u8`;
+    return videoData;
+}
 Crawler.post("/crawl/phimmoichill-biz/by-url", async (req, res) => {
 
+    const {
+        videoUrl,
+        email
+    } = req.body;
+    if (!videoUrl) {
+        return res.status(400).json("Invalid video URL");
+    }
+    const videoRaw = new VideoRawDataModel({
+        sourceUrl: videoUrl,
+        domain: 'phimmoichill-biz',
+        status: 'waiting',
+    });
+    try {
+        // check  src existed
+        const existed = await VideoRawDataModel.findOne({sourceUrl: videoUrl});
+        if (existed) {
+            return res.status(200).json(existed?.results);
+        }
+        const videoData = await getVideoInforFromUrlChill(videoUrl);
+        videoData.email = email;
+        videoRaw.status = 'done';
+        videoRaw.results = videoData;
+        await videoRaw.save();
+
+        return res.status(200).json(videoData);
+    } catch (error) {
+        console.error(error);
+        videoRaw.status = 'error';
+        videoRaw.error = error.message;
+    } finally {
+        await videoRaw.save();
+    }
+    return res.status(500).json({message: "An error occurred"});
+})
+// ============= phimmoichill-biz end ==============
+//  ============= phimmoiday ======
+const getVideoInforFromUrlmoiday = async (videoUrl) => {
+
+    const {data} = await axios.get(videoUrl);
+    const videoData = {
+        "Title": "xxx",
+        "Description": "xx",
+        "Tags": "xx",
+
+        "videoURL": "xxx",
+        "videoLength": 42.028005,
+        thumbnailURL: undefined,
+        views: 0,
+        rawData: {
+            source:  data
+        },
+    };
+    console.log('data from ', data)
+    const $ = cheerio.load(data);
+    videoData.Title = $('h1[itemprop=\'name\']').text();
+    videoData.Description = $('div.film-info > p').text();
+    videoData.thumbnailURL = $('img[itemprop=\'thumbnailUrl\']').attr('src');
+    // TODO Cần nâng lấy thông tin tag và meta data
+
+    // lấy link video
+    const extractId = (url) => {
+        const match = url.match(/pm(\d+)$/);
+        return match ? match[1] : null;
+    }
+    const qcao = extractId(videoUrl);
+    const form = new FormData();
+    form.append('qcao', qcao);
+    const videoRes = await axios.post('https://phimmoichill.biz/chillsplayer.php', form, {
+        headers: {
+            ...form.getHeaders(), // Thiết lập headers từ form
+        }
+    }).then(res => res.data);
+    console.log('videoRes', videoRes)
+    const regex = /iniPlayers\("([a-zA-Z0-9]+)"\s*,\s*\d+\s*,\s*\);/;
+    const match = videoRes.match(regex);
+
+    if (!match) {
+        console.log("Không tìm thấy ID.");
+    }
+    const videoId = match[1];
+    console.log('videoId', videoId)
+    videoData.videoURL = `https://dash.motchills.net/raw/${videoId}/index.m3u8`;
+    return videoData;
+}
+Crawler.post("/crawl/phimmoiday/by-url", async (req, res) => {
     const {
         videoUrl
     } = req.body;
     if (!videoUrl) {
         return res.status(400).json("Invalid video URL");
     }
+    const videoRaw = new VideoRawDataModel({
+        sourceUrl: videoUrl,
+        domain: 'phimmoiday',
+        status: 'waiting',
+    });
     try {
-        const videoData = {
-            "videoTitle": "xxx",
-            "videoDescription": "xx",
-            "tags": "xx",
-            "videoLink": "xxx",
-            "thumbnailLink": "xxx",
-            "email": "huyentester12@gmail.com",
-            "video_duration": 42.028005,
-            "publishDate": new Date(),
-            "Visibility": "Public",
-            crawlFrom: videoUrl
-        }
-        const {data} = await axios.get(videoUrl);
-        console.log('data from ', data)
-        const $ = cheerio.load(data);
-        const extractId = (url) => {
-            const match =  url.match(/pm(\d+)$/);
-            return match ? match[1] : null;
-        }
-        const qcao = extractId(videoUrl);
-        // laasy
+        const videoData = await getVideoInforFromUrlmoiday(videoUrl);
+        videoRaw.status = 'done';
+        videoRaw.results = videoData;
+        await videoRaw.save();
 
         return res.status(200).json(videoData);
     } catch (error) {
         console.error(error);
-        return res.status(500).json({message: "An error occurred"});
+        videoRaw.status = 'error';
+        videoRaw.error = error.message;
+    } finally {
+        await videoRaw.save();
     }
+    return res.status(500).json({message: "An error occurred"});
 })
+
 
 module.exports = Crawler;
