@@ -9,6 +9,9 @@ const crawlResult = new mongoose.Schema({
         type: String,
         required: true,
     },
+    videoURLType : {
+        type: String,
+    },
     Title: {
         type: String,
         required: true,
@@ -58,6 +61,10 @@ const VideoDataRaw = new mongoose.Schema({
   status: { // Trạng thái của action crawl
     type: String, // waiting,, done, error
   },
+    syncAt: {
+      type: Date,
+
+    },
   results: [crawlResult],
 });
 

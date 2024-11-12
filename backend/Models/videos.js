@@ -56,6 +56,9 @@ const VideoData = new mongoose.Schema({
         type: String,
         required: true,
       },
+      videoUrlType: {
+        type: String,
+      },
       ChannelProfile: {
         type: String,
         required: true,

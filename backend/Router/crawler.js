@@ -6,6 +6,8 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const FormData = require('form-data');
 const VideoRawDataModel = require("../Models/videos_raw");
+const userData = require("../Models/user");
+const videodata = require("../Models/videos");
 // ============= phimmoi-club start ==============
 const Crawler = express.Router();
 
@@ -18,6 +20,7 @@ const getVideoInforFromUrlPhimmoiclub = async (videoUrl) => {
         "Tags": "xx",
         Title: "xxx",
         videoURL: "xxx",
+        videoURLType : 'iframe',
         "thumbnailLink": "xxx",
         "email": "xxx",
         "videoLength": 42.028005,
@@ -118,7 +121,7 @@ const getVideoInforFromUrlChill = async (videoUrl) => {
         "Title": "xxx",
         "Description": "xx",
         "Tags": "xx",
-
+        videoURLType : 'm3u8',
         "videoURL": "xxx",
         "videoLength": 42.028005,
         thumbnailURL: undefined,
@@ -273,6 +276,95 @@ Crawler.post("/crawl/phimmoiday/by-url", async (req, res) => {
         await videoRaw.save();
     }
     return res.status(500).json({message: "An error occurred"});
+})
+
+Crawler.post('/sync-all-to-chanel', async (req, res) => {
+    try {
+        const {email,
+        } = req.body;
+        if (!email) {
+            return res.status(400).json("Invalid email");
+        }
+
+        const user = await userData.findOne({ email });
+        if (!user) {
+            return res.status(404).json("User not found");
+        }
+        let videosByEmail = await videodata.findOne({ email });
+
+
+    // lấy những video chưa sync lên kênh của user
+        // dk syncAt = null or not exist
+        /*
+        {
+  $or: [
+    { syncDate: { $exists: false } },
+    { syncDate: null }
+  ]
+}
+         */
+        const videos = await VideoRawDataModel.find({
+            $or: [
+                { syncAt: { $exists: false } },
+                { syncAt: null }
+            ]
+        });
+        for (const video of videos) {
+             video.results?.forEach(async (videoResult) => {
+                 user.videos.push({ videoURL: videoResult.videoURL, videoLength: videoResult?.videoLength });
+                 user.thumbnails.push({ imageURL: videoResult?.thumbnailURL });
+
+
+                 if (!videosByEmail)  {
+                     videosByEmail =  new videodata({
+                         email: email,
+                         VideoData: [
+                             {
+                                 thumbnailURL: videoResult?.thumbnailURL,
+                                 uploader: user.channelName,
+                                 videoURL: videoResult?.videoURL,
+                                 ChannelProfile: user.profilePic,
+                                 Title: videoResult?.Title,
+                                 videoUrlType: videoResult?.videoURLType,
+                                 Description: videoResult?.Description,
+                                 Tags: videoResult?.tags || 'phimle',
+                                 videoLength: videoResult?.videoLength,
+                                 uploaded_date: new Date(),
+                                 visibility: 'Public',
+                             },
+                         ],
+                     })
+                 } else {
+                     videosByEmail.VideoData.push({
+                         thumbnailURL: videoResult?.thumbnailURL,
+                         uploader: user.channelName,
+                         videoURL: videoResult?.videoURL,
+                         ChannelProfile: user.profilePic,
+                         Title: videoResult?.Title,
+                         videoUrlType: videoResult?.videoURLType,
+                         Description: videoResult?.Description,
+                         Tags: videoResult?.tags || 'phimle',
+                         videoLength: videoResult?.videoLength ,
+                         uploaded_date: new Date(),
+                         visibility: 'Public',
+                     });
+                 }
+             });
+            video.syncAt = new Date();
+        }
+        console.log('videosByEmail', videosByEmail)
+        console.log('videos', videos)
+        console.log('user', user)
+        // save all video
+        await  Promise.all(videos.map(video => video.save()));
+        await videosByEmail.save();
+        await user.save();
+        return res.status(200).json({message: "Synced all videos to channel", videos});
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({message: "An error occurred"});
+    }
+
 })
 
 

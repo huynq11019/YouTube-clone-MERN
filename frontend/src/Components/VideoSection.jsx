@@ -684,6 +684,7 @@ function VideoSection() {
     videoLength,
     uploaded_date,
     visibility,
+    videoURLType
   } = matchedVideo;
 
   document.title =
@@ -1043,10 +1044,26 @@ function VideoSection() {
       >
         <div className="left-video-section2">
           <div className="videoframe">
-            {/*video url*/}
-            <VideoPlayer
-                className="play-video"
-                videoUrl={videoURL} />
+            {
+              videoURLType === 'iframe' ? (
+                <div className="responsive-iframe-container">
+                    <iframe
+                        src={videoURL}
+                        title={Title}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    ></iframe>
+                </div>
+              ) : (
+                <VideoPlayer
+                  className="play-video"
+                  videoUrl={videoURL} />
+              )
+            }
+            {/*<VideoPlayer*/}
+            {/*    className="play-video"*/}
+            {/*    videoUrl={videoURL} />*/}
             {/*<video*/}
             {/*  className="play-video"*/}
             {/*  controls*/}
