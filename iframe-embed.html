@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responsive Iframe Without Scroll</title>
+    <style>
+        /* CSS cho iframe responsive */
+        .responsive-iframe-container {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%; /* Tỷ lệ khung hình 16:9 */
+            overflow: hidden;
+        }
+
+        .responsive-iframe-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+<h2>Iframe</h2>
+<div class="responsive-iframe-container">
+    <iframe
+            src="https://example.com"
+            frameborder="0"
+            scrolling="no"
+            allowfullscreen>
+    </iframe>
+</div>
+<h2>video </h2>
+
+</body>
+</html>

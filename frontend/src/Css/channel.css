@@ -194,6 +194,7 @@
 .myvideos-thumbnail {
   width: 250px;
   border-radius: 10px;
+  aspect-ratio: 16/9;
 }
 
 .myuploaded-videos {
@@ -429,6 +430,7 @@
 
 .myvidthumbnail {
   width: 300px;
+  aspect-ratio: 16/9  ;
   border-radius: 10px;
 }
 
