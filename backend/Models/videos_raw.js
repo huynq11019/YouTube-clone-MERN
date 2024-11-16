@@ -18,7 +18,7 @@ const crawlResult = new mongoose.Schema({
     },
     Description: {
         type: String,
-        required: true,
+        required: false,
     },
     Tags: {
         type: String,
@@ -38,7 +38,10 @@ const crawlResult = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+    videoInforUrl: {
+        type: String,
+    },
     });
 
 const VideoDataRaw = new mongoose.Schema({

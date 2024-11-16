@@ -333,7 +333,10 @@ const getVideoInforFromUrlPhephim = async (videoUrl) => {
     console.log('queryParams', queryParams)
     const videoRes = await axios.get('https://ww5.phephim.in/wp-content/themes/halimmovies/player.php',
         {
-            params: queryParams
+            params: queryParams,
+            headers:{
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+            }
         }
     )
         .catch(e => {
@@ -341,9 +344,19 @@ const getVideoInforFromUrlPhephim = async (videoUrl) => {
             queryParams.sub_server_id = 1;
             return axios.get('https://ww5.phephim.in/wp-content/themes/halimmovies/player.php',
                 {
-                    params: queryParams
+                    params: queryParams,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+                    }
                 }
             )
+        })
+        .catch(e => {
+            console.log('get file error 2', e);
+            videoData.videoInforUrl = `${e.request.host}${e.request.path}`
+            return Promise.reject({
+                result : videoData
+            });
         })
         .then(res => res.data);
     console.log('videoRes', videoRes)
@@ -428,7 +441,7 @@ const getAllVidePhimle = async () => {
         results:
             { $exists: false }
     });
-    const maxPage = 5;
+    const maxPage = 3;
 
     // duyệt theo từng page và lấy các video trong page đó
     for (let i = 2; i < maxPage; i++) {
@@ -484,9 +497,10 @@ const getAllVidePhimle = async () => {
               successCount.push(epUrl);
 
           }catch (e) {
-              console.error('error xxxx', e);
+              console.error('error xxxx >>>>>', e);
               videoRaw.status = 'error';
               videoRaw.error = e.message;
+              videoRaw.results = e.result;
               errorCount.push(epUrl);
           } finally {
               console.log('success count ', successCount.length);
