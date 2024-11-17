@@ -330,13 +330,26 @@ const getVideoInforFromUrlPhephim = async (videoUrl) => {
         post_id: post_id,
         nonce,
     };
+    const headers = {
+        'accept': 'text/html, */*; q=0.01',
+        'accept-language': 'en-US,en;q=0.8',
+        'priority': 'u=1, i',
+        'referer': videoUrl,
+        'sec-ch-ua': '"Chromium";v="130", "Brave";v="130", "Not?A_Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
+        'sec-gpc': '1',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'x-requested-with': 'XMLHttpRequest',
+    };
     console.log('queryParams', queryParams)
     const videoRes = await axios.get('https://ww5.phephim.in/wp-content/themes/halimmovies/player.php',
         {
             params: queryParams,
-            headers:{
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-            }
+            headers
         }
     )
         .catch(e => {
@@ -345,9 +358,7 @@ const getVideoInforFromUrlPhephim = async (videoUrl) => {
             return axios.get('https://ww5.phephim.in/wp-content/themes/halimmovies/player.php',
                 {
                     params: queryParams,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-                    }
+                    headers
                 }
             )
         })
@@ -355,7 +366,7 @@ const getVideoInforFromUrlPhephim = async (videoUrl) => {
             console.log('get file error 2', e);
             videoData.videoInforUrl = `${e.request.host}${e.request.path}`
             return Promise.reject({
-                result : videoData
+                result: videoData
             });
         })
         .then(res => res.data);
@@ -401,6 +412,7 @@ Crawler.post("/crawl/phephim/by-url", async (req, res) => {
             videoData: existed.results
         });
     }
+
     const videoRaw = new VideoRawDataModel({
         sourceUrl: videoUrl,
         domain: 'ww5.phephim.in',
@@ -423,96 +435,99 @@ Crawler.post("/crawl/phephim/by-url", async (req, res) => {
         await videoRaw.save();
     }
     return res.status(500).json({message: "An error occurred"});
-})
+});
+
+const getAllEsisodeFromUrlPhephim = async (url) => {
+    const episodeUrls = [];
+    const {data} = await axios.get(url);
+    const $ = cheerio.load(data);
+    const episodeItemsRef = $('#halim-list-server > .show_all_eps .halim-list-eps a');
+    //  lấy danh sách các tập phim
+    for (let episode of episodeItemsRef) {
+        const href = $(episode).attr('href');
+        episodeUrls.push(href);
+    }
+    console.log('episodeUrl', episodeUrls);
+
+    // check url existed
+    for (let epUrl of episodeUrls) {
+        const existed = await VideoRawDataModel.findOne({sourceUrl: epUrl});
+        if (existed) {
+            console.log(epUrl, 'existed ======>', existed);
+            continue;
+        }
+        const videoRaw = new VideoRawDataModel({
+            sourceUrl: epUrl,
+            domain: 'ww5.phephim.in',
+            status: 'waiting',
+            email: 'phimle@moiptube.com'
+        });
+
+        try {
+
+            const videoData = await getVideoInforFromUrlPhephim(epUrl);
+            videoRaw.status = 'done';
+            videoRaw.results = videoData;
+            console.log('videoData', videoData)
+            successCount.push(epUrl);
+
+        } catch (e) {
+            console.error('error xxxx >>>>>', e);
+            videoRaw.status = 'error';
+            videoRaw.error = e.message;
+            videoRaw.results = e.result;
+            errorCount.push(epUrl);
+        } finally {
+
+            await videoRaw.save();
+        }
+    }
+}
 
 // get all video from phephim
 const getAllVidePhimle = async () => {
     console.log('start get all video from phephim');
-    const originUrl = 'https://ww5.phephim.in/phim-le'
+    const originUrl = 'https://ww5.phephim.in/'
     const getPage = (currentPage) => {
         if (currentPage <= 1) {
             return originUrl;
         }
         return `${originUrl}/page/${currentPage}`
     }
-    const videoUrls = [];
     // xoá những bản ghi không có trường results (đã crawl nhưng không có kết quả)
     await VideoRawDataModel.deleteMany({
         results:
-            { $exists: false }
+            {$exists: false}
     });
-    const maxPage = 3;
-
-    // duyệt theo từng page và lấy các video trong page đó
-    for (let i = 2; i < maxPage; i++) {
-        const {data} = await axios.get(getPage(i));
-        // console.log('html page', data);
-        const $ = cheerio.load(data);
-        const videoItemsRef = $('.halim_box .grid-item');
-        for (let video of videoItemsRef) {
-            const videoUrl = $(video).find('a').attr('href');
-            videoUrls.push({
-                href: videoUrl,
-            });
-        }
-        console.log('loading page percent', i/maxPage * 100, '%');
-    }
+    const maxPage = 1;
     let successCount = [];
     let errorCount = [];
+    // duyệt theo từng page và lấy các video trong page đó
+    for (let i = 0; i < maxPage; i++) {
+        const {data} = await axios.get(getPage(i));
+        // lấy các video của page
+        const $page = cheerio.load(data);
+        const videoItemsRef = $page('.halim_box .grid-item, #halim-ajax-popular-post  .item');
+        console.log('page ', i, 'tìm thấy ', videoItemsRef.length);
+        for (let video of videoItemsRef) {
+            const url = $page(video).find('a').attr('href');
+            // lấy những tập phim theo url
+            try {
+                await getAllEsisodeFromUrlPhephim(url);
+                successCount.push(url);
+            } catch (e) {
+                console.error('error get all episode from url', url, e);
+                errorCount.push(url);
 
-    for (let video of videoUrls) {
-        const url = video.href;
-        // lấy những tập phim theo url
-        const episodeUrls = [];
-        const {data} = await axios.get(url);
-        const $ = cheerio.load(data);
-        const episodeItemsRef = $('#halim-list-server > .show_all_eps .halim-list-eps a');
-        //  lấy danh sách các tập phim
-        for (let episode of episodeItemsRef) {
-            const href = $(episode).attr('href');
-            episodeUrls.push(href);
+            }
+
+            console.log('success count ', successCount.length);
+            console.log('error count ', errorCount.length);
         }
-        console.log('episodeUrl', episodeUrls);
-
-       // check url existed
-      for (let epUrl of episodeUrls) {
-          const existed = await VideoRawDataModel.findOne({sourceUrl: epUrl});
-          if (existed) {
-              console.log(epUrl, 'existed ======>', existed);
-              continue;
-          }
-          const videoRaw = new VideoRawDataModel({
-              sourceUrl: epUrl,
-              domain: 'ww5.phephim.in',
-              status: 'waiting',
-              email: 'phimle@moiptube.com'
-          });
-
-          try {
-
-              const videoData = await getVideoInforFromUrlPhephim(epUrl);
-              videoRaw.status = 'done';
-              videoRaw.results = videoData;
-              console.log('videoData', videoData)
-              successCount.push(epUrl);
-
-          }catch (e) {
-              console.error('error xxxx >>>>>', e);
-              videoRaw.status = 'error';
-              videoRaw.error = e.message;
-              videoRaw.results = e.result;
-              errorCount.push(epUrl);
-          } finally {
-              console.log('success count ', successCount.length);
-              await videoRaw.save();
-          }
-      }
-        // console.log('loading video percent', video.href, '=>', videoUrls.length, i / videoUrls.length * 100, '%');
+        console.log('loading page percent', i / maxPage * 100, '%');
     }
-    console.log('successCount', successCount.length,successCount);
-    console.log('errorCount',errorCount.length ,errorCount);
-    console.log('video url =>>>>>>> ', videoUrls);
-
+    console.log('successCount', successCount.length, successCount);
+    console.log('errorCount', errorCount.length, errorCount);
 }
 const removeAllError = async () => {
     await VideoRawDataModel.deleteMany({
@@ -538,7 +553,7 @@ const removeDublicateBySourceUrl = async () => {
     }
 }
 
-getAllVidePhimle().then(r => console.log('done get all video from phephim'));
+// getAllVidePhimle().then(r => console.log('done get all video from phephim'));
 // removeAllError().then(r => console.log('done remove all error'));
 // removeDublicateBySourceUrl().then(r => console.log('done remove duplicate'));
 // ============= phephim end ==============
@@ -578,52 +593,61 @@ Crawler.post('/sync-all-to-chanel', async (req, res) => {
             , status: 'done'
         });
         for (const video of videos) {
-            video.results?.forEach(async (videoResult) => {
-                if (!videosByEmail) {
-                    videosByEmail = new videodata({
-                        email: email,
-                        VideoData: [
-                            {
-                                thumbnailURL: videoResult?.thumbnailURL,
-                                uploader: user.channelName,
-                                videoURL: videoResult?.videoURL,
-                                ChannelProfile: user.profilePic,
-                                Title: videoResult?.Title,
-                                videoUrlType: videoResult?.videoURLType,
-                                Description: videoResult?.Description,
-                                Tags: videoResult?.tags || 'phimle',
-                                videoLength: videoResult?.videoLength,
-                                uploaded_date: new Date(),
-                                visibility: 'Public',
-                            },
-                        ],
-                    })
-                    user.videos.push({videoURL: videoResult.videoURL, videoLength: videoResult?.videoLength});
-                    user.thumbnails.push({imageURL: videoResult?.thumbnailURL});
-                } else {
-                    // check video name existed
-                    const existed = videosByEmail.VideoData.find(v => v.Title === videoResult?.Title);
+
+            video.results
+
+                ?.forEach(async (videoResult) => {
+                    const existed = videosByEmail.VideoData.find(v => v.Title === videoResult?.Title)
                     if (existed) {
                         console.log('video existed', existed);
                         return;
                     }
-                    videosByEmail.VideoData.push({
-                        thumbnailURL: videoResult?.thumbnailURL,
-                        uploader: user.channelName,
-                        videoURL: videoResult?.videoURL,
-                        ChannelProfile: user.profilePic,
-                        Title: videoResult?.Title,
-                        videoUrlType: videoResult?.videoURLType,
-                        Description: videoResult?.Description,
-                        Tags: videoResult?.tags || 'phimle',
-                        videoLength: videoResult?.videoLength,
-                        uploaded_date: new Date(),
-                        visibility: 'Public',
-                    });
                     user.videos.push({videoURL: videoResult.videoURL, videoLength: videoResult?.videoLength});
                     user.thumbnails.push({imageURL: videoResult?.thumbnailURL});
-                }
-            });
+                    if (!videosByEmail) {
+                        videosByEmail = new videodata({
+                            email: email,
+                            VideoData: [
+                                {
+                                    thumbnailURL: videoResult?.thumbnailURL,
+                                    uploader: user.channelName,
+                                    videoURL: videoResult?.videoURL,
+                                    ChannelProfile: user.profilePic,
+                                    Title: videoResult?.Title,
+                                    videoUrlType: videoResult?.videoURLType,
+                                    Description: videoResult?.Description,
+                                    Tags: videoResult?.tags || 'phimle',
+                                    videoLength: videoResult?.videoLength,
+                                    uploaded_date: new Date(),
+                                    visibility: 'Public',
+                                },
+                            ],
+                        })
+                        user.videos.push({videoURL: videoResult.videoURL, videoLength: videoResult?.videoLength});
+                        user.thumbnails.push({imageURL: videoResult?.thumbnailURL});
+                    } else {
+                        // check video name existed
+                        // const existed = videosByEmail.VideoData.find(v => v.Title === videoResult?.Title);
+                        // if (existed) {
+                        //     console.log('video existed', existed);
+                        //     return;
+                        // }
+                        videosByEmail.VideoData.push({
+                            thumbnailURL: videoResult?.thumbnailURL,
+                            uploader: user.channelName,
+                            videoURL: videoResult?.videoURL,
+                            ChannelProfile: user.profilePic,
+                            Title: videoResult?.Title,
+                            videoUrlType: videoResult?.videoURLType,
+                            Description: videoResult?.Description,
+                            Tags: videoResult?.tags || 'phimle',
+                            videoLength: videoResult?.videoLength,
+                            uploaded_date: new Date(),
+                            visibility: 'Public',
+                        });
+
+                    }
+                });
             video.syncAt = new Date();
         }
         console.log('videosByEmail', videosByEmail)
