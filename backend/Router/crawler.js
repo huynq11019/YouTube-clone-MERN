@@ -11,7 +11,10 @@ const videodata = require("../Models/videos");
 // ============= phimmoi-club start ==============
 const Crawler = express.Router();
 
-const getVideoInforFromUrlPhimmoiclub = async (videoUrl) => {
+
+Crawler.use(cookieParser());
+
+const getVideoInforFromUrlPhimmoiclub = async (videoUrl, extraVideoData) => {
     const {data} = await axios.get(videoUrl);
     const $ = cheerio.load(data);
     const videoData = {
@@ -28,12 +31,18 @@ const getVideoInforFromUrlPhimmoiclub = async (videoUrl) => {
         rawData: {
             source: data
         },
+        ...(extraVideoData ?? {})
     }
     // get video title
-    videoData.Title = $('.sheader div.data h1').text();
-    videoData.thumbnailURL = $('.sheader .poster img ').attr('src');
-    const videoDescription = $('.wp-content p');
-    videoData.Description = videoDescription.text();
+    videoData.Title = $('.sheader div.data h1').text() || $('#info h1.epih1').text();
+    const thumbnailURL = $('.sheader .poster img ').attr('src');
+    if (thumbnailURL) {
+        videoData.thumbnailURL = thumbnailURL;
+    }
+    if (videoData.Description !=='xx') {
+        const videoDescription = $('.wp-content p');
+        videoData.Description = videoDescription.text();
+    }
     // TODO Cần nâng lấy thông tin tag và meta data
 
 
@@ -55,7 +64,150 @@ const getVideoInforFromUrlPhimmoiclub = async (videoUrl) => {
     return videoData;
 }
 
-Crawler.use(cookieParser());
+const getAllVideoByPagePhimmoiClub = async (pageUrl) => {
+    console.log('start get all video from phimmoi.club =>> ', pageUrl);
+    let currentPage = 1;
+    const getPageUrl = () => {
+        if (currentPage <= 1) {
+            return pageUrl;
+        }
+        return `${pageUrl}/page/${currentPage}`
+    }
+
+    // điều kiện dừng của page là status = 301
+    let isStop = false;
+    while (!isStop) {
+
+        const {data, status} = await axios.get(getPageUrl());
+        console.log('data from page :',getPageUrl())
+        // check http status
+        if (status === 301) {
+            isStop = true;
+            console.log('stop get all video from phimmoi.club');
+            continue;
+        }
+        const $ = cheerio.load(data);
+        console.log('page', data);
+        const videoLink = new Set();
+        const videoItemsRef = $('#archive-content .item, .content  .item');
+        if (!videoItemsRef.length) {
+            console.log('no video in page', currentPage);
+            console.log('stop get all video from phimmoi.club');
+            isStop = true;
+            continue;
+        }
+        const getVideoFromUrl = async (videoUrl, extraData) => {
+            // lấy những tập phim theo url
+            const existed = await VideoRawDataModel.findOne({sourceUrl: videoUrl});
+            if (existed) {
+                console.log('video existed', existed);
+                return Promise.resolve();
+            }
+            const videoRaw = new VideoRawDataModel({
+                sourceUrl: videoUrl,
+                domain: 'phimmoi.club',
+                status: 'waiting',
+            });
+            try {
+                console.log('start get video from url', videoUrl);
+                videoLink.add(videoUrl);
+                const videoData = await getVideoInforFromUrlPhimmoiclub(videoUrl,extraData);
+                videoData.email = 'phimle@moitube.com';
+
+                videoRaw.status = 'done';
+                console.log('videoData', videoData);
+            } catch (e) {
+                console.error('error get video from url', videoUrl, e);
+                videoRaw.status = 'error';
+                videoRaw.error = e.message;
+            } finally {
+                await videoRaw.save();
+            }
+        }
+        for (let video of videoItemsRef) {
+            // check là phim bo hay phim le
+            const url = $(video).find('a').attr('href');
+        // check phimbo or phimle
+            const isTVShow = $(video).attr("class").includes('tvshows');
+            if (isTVShow) {
+                console.log('get phim bộ from url', url);
+                // get all episode from url
+                const phimDetail = await axios.get(url);
+                const $detail = cheerio.load(phimDetail.data);
+                const thumbnailURL = $detail('.sheader .poster img ').attr('src');
+                const videoDescription =  $detail('.wp-content p');
+
+
+                const episodeItemsRef = $detail('#episodes #seasons  .episodios a');
+                for (let episode of episodeItemsRef) {
+                    // check khả dụng của tập phim
+                    const isAvailable =!( $detail(episode).attr('class') || '').includes('nonex');
+                    const episodeUrl = $detail(episode).attr('href');
+
+                    if (!isAvailable) {
+                        console.error('episode not available', episodeUrl);
+                        continue;
+                    }
+
+                    getVideoFromUrl(episodeUrl, {
+                        thumbnailURL,
+                        Description: videoDescription.text(),
+                    });
+                }
+
+            } else {
+                console.log('get phim lẻ from url', url);
+                getVideoFromUrl(url);
+            }
+
+
+        }
+        console.log('all video link of page', currentPage , videoLink);
+        currentPage++;
+    }
+
+}
+
+const retryphimmoiClub = async () => {
+    const allVideos = await VideoRawDataModel.find({
+        domain: 'phimmoi.club',
+        $or: [
+            {status: 'error'},
+            {results: {$exists: false}},
+            {results: null},
+            // results = []
+            {results: {$size: 0}},
+        ]
+    });
+    if (!allVideos.length) {
+        console.log('no video error');
+        return;
+    }
+    for (let video of allVideos) {
+          const videoDoc = (await video);
+          console.log('retry video', videoDoc.sourceUrl);
+          try {
+              const videoData = await getVideoInforFromUrlPhimmoiclub(videoDoc.sourceUrl);
+              if (!videoData?.thumbnailURL ) {
+                  videoData.thumbnailURL = 'default';
+              }
+
+              videoDoc.status = 'done';
+              videoDoc.results = videoData;
+              await videoDoc.save();
+          } catch (e) {
+              console.error('error xxxx >>>>>', e);
+              videoDoc.status = 'error';
+              videoDoc.error = e.message;
+              videoDoc.results = e.result;
+              await videoDoc.save();
+          }
+        console.log('success ',videoDoc.sourceUrl);
+    }
+}
+retryphimmoiClub().then(r => console.log('done retry phimmoi.club'));
+// getAllVideoByPagePhimmoiClub('https://phimmoi.club/the-loai/phim-netflix').then(r => console.log('done get all video from phimmoi.club'));
+
 Crawler.post("/crawl/phimmoi-club/by-url", async (req, res) => {
     //     const refreshToken = req.cookies?.refreshToken;
     // const accessToken = req.cookies?.accessToken;
@@ -306,7 +458,7 @@ const getVideoInforFromUrlPhephim = async (videoUrl) => {
 // Tách URL và lấy phần tử cuối cùng
     const lastPart = videoUrl.split('/').pop();
     // Tạo biểu thức chính quy để lấy `tapphim` và `server`
-    const regex = /^([^-]+)-sv(\d+)\.html$/;
+    const regex =  /^(.*?)-sv(\d+)\.html$/;
 
 // Áp dụng biểu thức chính quy để trích xuất `tapphim` và `server`
     const match = lastPart.match(regex);
@@ -403,40 +555,16 @@ Crawler.post("/crawl/phephim/by-url", async (req, res) => {
     if (!videoUrl) {
         return res.status(400).json("Invalid video URL");
     }
-    ;
-    // check url existed
-    const existed = await VideoRawDataModel.findOne({sourceUrl: videoUrl});
-    if (existed) {
-        return res.status(400).json({
-            message: "Video URL existed",
-            videoData: existed.results
-        });
-    }
-
-    const videoRaw = new VideoRawDataModel({
-        sourceUrl: videoUrl,
-        domain: 'ww5.phephim.in',
-        status: 'waiting',
-    });
     try {
-        const videoData = await getVideoInforFromUrlPhephim(videoUrl);
-        videoData.email = email;
-        videoRaw.status = 'done';
-        videoRaw.results = videoData;
+        const videoData = await getAllEsisodeFromUrlPhephim(videoUrl);
         console.log('videoData', videoData)
-        // await videoRaw.save();
-
         return res.status(200).json(videoData);
     } catch (error) {
         console.error(error);
-        videoRaw.status = 'error';
-        videoRaw.error = error.message;
-    } finally {
-        await videoRaw.save();
     }
     return res.status(500).json({message: "An error occurred"});
 });
-
+// lấy all danh sách tập phim của phim
 const getAllEsisodeFromUrlPhephim = async (url) => {
     const episodeUrls = [];
     const {data} = await axios.get(url);
@@ -449,6 +577,7 @@ const getAllEsisodeFromUrlPhephim = async (url) => {
     }
     console.log('episodeUrl', episodeUrls);
 
+    const videoCrawl = [];
     // check url existed
     for (let epUrl of episodeUrls) {
         const existed = await VideoRawDataModel.findOne({sourceUrl: epUrl});
@@ -469,25 +598,24 @@ const getAllEsisodeFromUrlPhephim = async (url) => {
             videoRaw.status = 'done';
             videoRaw.results = videoData;
             console.log('videoData', videoData)
-            successCount.push(epUrl);
-
+            videoCrawl.push(videoRaw);
         } catch (e) {
             console.error('error xxxx >>>>>', e);
             videoRaw.status = 'error';
             videoRaw.error = e.message;
             videoRaw.results = e.result;
-            errorCount.push(epUrl);
         } finally {
-
             await videoRaw.save();
+            console.log('success ',videoCrawl.length, '/', episodeUrls.length);
         }
     }
+    return videoCrawl;
 }
 
 // get all video from phephim
 const getAllVidePhimle = async () => {
     console.log('start get all video from phephim');
-    const originUrl = 'https://ww5.phephim.in/'
+    const originUrl = 'https://ww5.phephim.in/phim-le'
     const getPage = (currentPage) => {
         if (currentPage <= 1) {
             return originUrl;
@@ -499,35 +627,41 @@ const getAllVidePhimle = async () => {
         results:
             {$exists: false}
     });
-    const maxPage = 1;
+    const maxPage = 1005;
     let successCount = [];
     let errorCount = [];
     // duyệt theo từng page và lấy các video trong page đó
     for (let i = 0; i < maxPage; i++) {
-        const {data} = await axios.get(getPage(i));
-        // lấy các video của page
-        const $page = cheerio.load(data);
-        const videoItemsRef = $page('.halim_box .grid-item, #halim-ajax-popular-post  .item');
-        console.log('page ', i, 'tìm thấy ', videoItemsRef.length);
-        for (let video of videoItemsRef) {
-            const url = $page(video).find('a').attr('href');
-            // lấy những tập phim theo url
-            try {
-                await getAllEsisodeFromUrlPhephim(url);
-                successCount.push(url);
-            } catch (e) {
-                console.error('error get all episode from url', url, e);
-                errorCount.push(url);
+      setTimeout(async () => {
+        try {
+            const {data} = await axios.get(getPage(i));
+            // lấy các video của page
+            const $page = cheerio.load(data);
+            const videoItemsRef = $page('.halim_box .grid-item, #halim-ajax-popular-post  .item');
+            console.log('page ', i, 'tìm thấy ', videoItemsRef.length);
+            for (let video of videoItemsRef) {
+                const url = $page(video).find('a').attr('href');
+                // lấy những tập phim theo url
+                try {
+                    await getAllEsisodeFromUrlPhephim(url);
+                    successCount.push(url);
+                } catch (e) {
+                    console.error('error get all episode from url', url, e);
+                    errorCount.push(url);
 
+                }
+
+                console.log('success count ', successCount.length);
+                console.log('error count ', errorCount.length);
             }
-
-            console.log('success count ', successCount.length);
-            console.log('error count ', errorCount.length);
+            console.log('loading page percent', i / maxPage * 100, '%');
+        } catch (e) {
+            console.error('error get page', i, e);
         }
-        console.log('loading page percent', i / maxPage * 100, '%');
+      }, 0)
     }
-    console.log('successCount', successCount.length, successCount);
-    console.log('errorCount', errorCount.length, errorCount);
+    console.log('Complete successCount', successCount.length, successCount);
+    console.log('Complete errorCount', errorCount.length, errorCount);
 }
 const removeAllError = async () => {
     await VideoRawDataModel.deleteMany({
@@ -552,6 +686,34 @@ const removeDublicateBySourceUrl = async () => {
         }
     }
 }
+const retryPhephim = async () => {
+    const allVideos = await VideoRawDataModel.find({
+        domain: 'ww5.phephim.in',
+        status: 'error'
+    });
+    if (!allVideos.length) {
+        console.log('no video error');
+        return;
+    }
+    for (let video of allVideos) {
+        const videoDoc = (await video);
+        console.log('retry video', videoDoc.sourceUrl);
+        try {
+            const videoData = await getVideoInforFromUrlPhephim(videoDoc.sourceUrl);
+            videoDoc.status = 'done';
+            videoDoc.results = videoData;
+            await videoDoc.save();
+        } catch (e) {
+            console.error('error xxxx >>>>>', e);
+            videoDoc.status = 'error';
+            videoDoc.error = e.message;
+            videoDoc.results = e.result;
+            await videoDoc.save();
+        }
+
+    }
+}
+retryPhephim().then(r => console.log('done retry phephim'));
 
 // getAllVidePhimle().then(r => console.log('done get all video from phephim'));
 // removeAllError().then(r => console.log('done remove all error'));
@@ -590,8 +752,10 @@ Crawler.post('/sync-all-to-chanel', async (req, res) => {
                 {syncAt: null}
             ]
             // đã crawl thành công
-            , status: 'done'
+            ,
+            status: 'done'
         });
+
         for (const video of videos) {
 
             video.results
@@ -615,7 +779,7 @@ Crawler.post('/sync-all-to-chanel', async (req, res) => {
                                     ChannelProfile: user.profilePic,
                                     Title: videoResult?.Title,
                                     videoUrlType: videoResult?.videoURLType,
-                                    Description: videoResult?.Description,
+                                    Description: videoResult?.Description || 'xzzx',
                                     Tags: videoResult?.tags || 'phimle',
                                     videoLength: videoResult?.videoLength,
                                     uploaded_date: new Date(),
@@ -639,7 +803,7 @@ Crawler.post('/sync-all-to-chanel', async (req, res) => {
                             ChannelProfile: user.profilePic,
                             Title: videoResult?.Title,
                             videoUrlType: videoResult?.videoURLType,
-                            Description: videoResult?.Description,
+                            Description: videoResult?.Description || 'xzzx',
                             Tags: videoResult?.tags || 'phimle',
                             videoLength: videoResult?.videoLength,
                             uploaded_date: new Date(),

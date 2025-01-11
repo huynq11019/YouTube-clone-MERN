@@ -1,6 +1,6 @@
 require("dotenv").config()
 const mongoose = require("mongoose");
-
+const mongoOnline = 'mongodb+srv://huynq1808:Huynq1808@@clusterdb1.spz4ncq.mongodb.net/?retryWrites=true&w=majority&appName=Clusterdb1'
 mongoose
   .connect(
     `mongodb://${process.env.DB_user}:${process.env.DB_password}@localhost:27017/${process.env.DB_name}?authSource=admin`,
